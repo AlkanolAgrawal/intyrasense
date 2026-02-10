@@ -62,12 +62,11 @@ def answer_question(question: str, chat_history: list, selected_document: str | 
         retrieved_docs.append(doc)
         similarity_scores.append(score)
 
-    # Calculate confidence score from average similarity distance
-    # Lower distance = higher similarity = higher confidence
+    # confidence score
     average_distance = sum(similarity_scores) / len(similarity_scores)
     confidence = float(max(0.0, min(1.0, 1 / (1 + average_distance))))
     
-    # Reject answers with very low confidence (likely irrelevant results)
+    # Reject low confidence answers 
     if confidence < 0.25:
         return {
             "answer": "Not found in internal documents.",
@@ -93,7 +92,7 @@ def answer_question(question: str, chat_history: list, selected_document: str | 
         page_number = doc.metadata.get("page", "N/A")
         citation_set.add(f"{source_file} | page {page_number}")
 
-    # Handle case where all chunks were too short
+    # Empty context fallback
     if not context_text.strip():
         return {
             "answer": "Not found in internal documents.",
@@ -150,7 +149,6 @@ def summarize_documents(selected_document: str | None = None):
 
     # Generate summary using LLM with summarization prompt
     final_prompt = SUMMARY_PROMPT.format(context=context_text)
-
     llm_response = llm.invoke([HumanMessage(content=final_prompt)])
 
     return {

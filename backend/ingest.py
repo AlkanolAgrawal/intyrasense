@@ -42,8 +42,8 @@ def load_documents():
 
         for d in loaded:
             d.metadata["source"] = file
-        docs.extend(loaded)
-
+            # docs.append(d)
+        docs.extend(loaded) ##adds all d at once
     return docs
 
 
@@ -58,14 +58,14 @@ def ingest_documents():
         # No documents to index
         return
 
-    # Split documents into chunks for better retrieval
+    # Chunking
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=800,
         chunk_overlap=100
     )
     document_chunks = text_splitter.split_documents(documents)
 
-    # Initialize embedding model (lightweight but effective)
+    # Initialize embedding model 
     embedding_model = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )

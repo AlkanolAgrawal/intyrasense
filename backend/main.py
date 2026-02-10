@@ -24,16 +24,11 @@ class QueryRequest(BaseModel):
 async def upload_docs(files: list[UploadFile] = File(...)):
     """
     Upload and index documents.
-    
-    Accepts multiple files (PDF, Markdown, or Text) and rebuilds the FAISS index.
-    Previously uploaded documents will be included in the new index.
     """
-    # Validate and save each uploaded file
     for file in files:
-        # Get file extension and normalize to lowercase
+        # file extension
         file_extension = os.path.splitext(file.filename)[1].lower()
         
-        # Only accept PDF, Markdown, and Text files
         if file_extension not in {".pdf", ".md", ".txt"}:
             return {"error": f"Unsupported file type: {file_extension}"}
 
@@ -42,7 +37,7 @@ async def upload_docs(files: list[UploadFile] = File(...)):
         with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-    # Rebuild the vector index with all documents (old + new)
+    # Rebuild 
     ingest_documents()
     
     return {"status": "Index rebuilt successfully"}
