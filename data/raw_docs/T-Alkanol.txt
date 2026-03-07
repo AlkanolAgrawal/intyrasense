@@ -1,0 +1,50 @@
+Rohan Agrawal - Profile Data
+Personal and Academic
+Name: Rohan Agrawal
+
+Study Program: B.Tech in Computer Science (AIML specialization)
+
+Institute: IET LUCKNOW UP 226021
+
+Email: rohanagrawall2004@gmail.com
+
+Technical Skills
+Programming Languages: Python, C++
+
+Data Science/Analysis Libraries: Matplotlib, Pandas, NumPy
+
+Version Control: Git, GitHub
+
+Software Tools: VS Code
+
+AIML Concepts: Supervised Learning, Unsupervised Learning
+
+Core Competencies (DSA and Competitive Programming)
+Data Structures and Algorithms (DSA): Core competency
+
+CodeChef Rating: 3-star
+
+CodeForces Rank: Pupil
+
+Key Projects
+Project Name: Movie Recommender
+
+Project Description: A system that recommends movies.
+
+Technologies Used: fastText for text embeddings.
+
+Deployment: Deployed on Hugging Face Spaces.
+
+Achievements
+Naukri Campus Contest: Cleared the first round of Young Turks. Scored 11,000 in the second round.
+
+Olympiad: Gold medalist during school.
+
+Hobbies
+Calisthenics
+
+Chess
+
+Gaming (PC and Mobile)
+
+Reading

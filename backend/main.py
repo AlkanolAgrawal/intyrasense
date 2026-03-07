@@ -1,14 +1,12 @@
-from fastapi import FastAPI, UploadFile, File
-import os
-import shutil
 from dotenv import load_dotenv
+load_dotenv(override=True)
 
+import os
+from fastapi import FastAPI, UploadFile, File
+import shutil
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
 from backend.utils import list_documents
-
-load_dotenv()
-
 app = FastAPI()
 
 UPLOAD_DIR = "data/raw_docs"
@@ -20,6 +18,8 @@ class QueryRequest(BaseModel):
     question: str
     chat_history: list = []
 
+class SummarizeRequest(BaseModel):
+    document: str
 @app.post("/upload")
 async def upload_docs(files: list[UploadFile] = File(...)):
     """
@@ -39,7 +39,6 @@ async def upload_docs(files: list[UploadFile] = File(...)):
 
     # Rebuild 
     ingest_documents()
-    
     return {"status": "Index rebuilt successfully"}
 
 @app.post("/query")
@@ -51,8 +50,8 @@ async def query(payload: dict):
     )
 
 @app.post("/summarize")
-async def summarize():
-    return summarize_documents()
+async def summarize(payload: dict):
+    return summarize_documents(payload.get("document"))
 
 
 @app.get("/documents")

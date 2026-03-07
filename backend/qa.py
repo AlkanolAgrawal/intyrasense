@@ -1,6 +1,9 @@
+from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
+from langchain_huggingface import HuggingFaceEmbeddings
 
+from backend.ingest import INDEX_DIR
 from backend.retriever import retrieve_with_score
 from backend.prompts import SYSTEM_PROMPT, SUMMARY_PROMPT
 
@@ -14,7 +17,6 @@ def rewrite_question(chat_history, question, llm):
     for past_question, past_answer in chat_history[-3:]:
         history_context += f"Q: {past_question}\nA: {past_answer}\n"
 
-    # Prompt for rewriting the question
     rewrite_prompt = f"""
 Rewrite the follow-up question so it is fully self-contained.
 
@@ -114,44 +116,70 @@ def answer_question(question: str, chat_history: list, selected_document: str | 
         "citations": list(citation_set),
         "confidence": round(confidence, 2)
     }
-
-
 def summarize_documents(selected_document: str | None = None):
     llm = ChatGroq(
         model="llama-3.1-8b-instant",
         temperature=0
     )
 
-    # Retrieve relevant chunks (uses generic query for broad coverage)
-    retrieval_results = retrieve_with_score(
-        "summarize the document",
-        selected_document
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
-    # Handle case where no documents are found
-    if not retrieval_results:
+    db = FAISS.load_local(
+        INDEX_DIR,
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+
+    # Collect ALL chunks of the selected document
+    all_chunks = [
+        doc for doc in db.docstore._dict.values()
+        if doc.metadata.get("source") == selected_document
+    ]
+
+    if not all_chunks:
         return {
             "summary": "Not found in internal documents.",
             "citations": []
         }
 
-    # Build context from all retrieved chunks
-    context_text = ""
-    citation_set = set()
+    # ---- Small Document: Direct Summary ----
+    full_text = "\n\n".join(doc.page_content for doc in all_chunks)
 
-    for doc, _ in retrieval_results:
-        context_text += doc.page_content + "\n\n"
-        
-        # Extract citation information
-        source_file = doc.metadata.get("source", "unknown")
-        page_number = doc.metadata.get("page", "N/A")
-        citation_set.add(f"{source_file} | page {page_number}")
+    if len(full_text) < 6000:  # safe threshold for context window
+        final_prompt = SUMMARY_PROMPT.format(context=full_text)
+        response = llm.invoke([HumanMessage(content=final_prompt)])
 
-    # Generate summary using LLM with summarization prompt
-    final_prompt = SUMMARY_PROMPT.format(context=context_text)
-    llm_response = llm.invoke([HumanMessage(content=final_prompt)])
+        citations = {
+            f"{doc.metadata.get('source')} | page {doc.metadata.get('page', 'N/A')}"
+            for doc in all_chunks
+        }
+
+        return {
+            "summary": response.content.strip(),
+            "citations": list(citations)
+        }
+
+    # ---- Large Document: Hierarchical Summarization ----
+    partial_summaries = []
+
+    for doc in all_chunks:
+        prompt = SUMMARY_PROMPT.format(context=doc.page_content)
+        response = llm.invoke([HumanMessage(content=prompt)])
+        partial_summaries.append(response.content)
+
+    combined_text = "\n".join(partial_summaries)
+
+    final_prompt = SUMMARY_PROMPT.format(context=combined_text)
+    final_response = llm.invoke([HumanMessage(content=final_prompt)])
+
+    citations = {
+        f"{doc.metadata.get('source')} | page {doc.metadata.get('page', 'N/A')}"
+        for doc in all_chunks
+    }
 
     return {
-        "summary": llm_response.content.strip(),
-        "citations": list(citation_set)
+        "summary": final_response.content.strip(),
+        "citations": list(citations)
     }

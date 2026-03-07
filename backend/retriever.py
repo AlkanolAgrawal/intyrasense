@@ -2,8 +2,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 INDEX_DIR = "data/faiss_index"
-
-def get_retriever(document: str | None = None):
+def retrieve_with_score(query: str, document: str | None = None):
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
@@ -13,35 +12,18 @@ def get_retriever(document: str | None = None):
         embeddings,
         allow_dangerous_deserialization=True
     )
-    
-    if document:
-        return db.as_retriever(
-            search_kwargs={
-                "k": 5,
-                "filter": {"source": document}
-            }
-        )
+    print("Selected:", document)
 
-    return db.as_retriever(search_kwargs={"k": 4})
-
-def retrieve_with_score(query: str, document: str | None = None, k: int = 5):
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-    db = FAISS.load_local(
-        INDEX_DIR,
-        embeddings,
-        allow_dangerous_deserialization=True
-    )
-
+    all_docs = db.docstore._dict.values()
+    print("Indexed sources:")
+    print(set(d.metadata["source"] for d in all_docs))
     if document:
         results = db.similarity_search_with_score(
             query,
-            k=k,
+            k=50,
             filter={"source": document}
         )
     else:
-        results = db.similarity_search_with_score(query, k=k)
+        results = db.similarity_search_with_score(query, k=10)
 
     return results
