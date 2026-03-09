@@ -1,6 +1,2 @@
 streamlit
-altair
-pydeck
-watchdog
-pandas
 requests

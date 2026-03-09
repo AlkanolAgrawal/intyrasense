@@ -1,32 +1,31 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi
 uvicorn
-python-dotenv
-python-multipart
+streamlit
 
-langchain
+langchain-core
 langchain-community
-langchain-groq
 langchain-huggingface
+langchain-groq
+langchain-text-splitters
 
 sentence-transformers
 transformers
-torch --index-url https://download.pytorch.org/whl/cpu
-faiss-cpu
+torch
 
-pandas
-numpy
-scikit-learn
+faiss-cpu
 
 pytesseract
 pdf2image
-PyMuPDF
 pypdf
+PyMuPDF
 
+python-dotenv
+python-multipart
+
+pillow
 beautifulsoup4
 lxml
 
 requests
-
-streamlit
-altair
-pydeck
