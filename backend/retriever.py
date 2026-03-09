@@ -1,22 +1,30 @@
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 INDEX_DIR = "data/faiss_index"
-def retrieve_with_score(query: str, document: str | None = None):
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
 
-    db = FAISS.load_local(
-        INDEX_DIR,
-        embeddings,
-        allow_dangerous_deserialization=True
-    )
+# load embeddings once
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={"device": "cpu"}
+)
+
+# load FAISS index once
+db = FAISS.load_local(
+    INDEX_DIR,
+    embeddings,
+    allow_dangerous_deserialization=True
+)
+
+def retrieve_with_score(query: str, document: str | None = None):
+    global db
+
     print("Selected:", document)
 
     all_docs = db.docstore._dict.values()
     print("Indexed sources:")
-    print(set(d.metadata["source"] for d in all_docs))
+    print({d.metadata["source"] for d in all_docs})
+
     if document:
         results = db.similarity_search_with_score(
             query,
@@ -27,3 +35,13 @@ def retrieve_with_score(query: str, document: str | None = None):
         results = db.similarity_search_with_score(query, k=10)
 
     return results
+
+
+# call this after re-ingesting documents
+def reload_index():
+    global db
+    db = FAISS.load_local(
+        INDEX_DIR,
+        embeddings,
+        allow_dangerous_deserialization=True
+    )

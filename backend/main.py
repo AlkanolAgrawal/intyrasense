@@ -1,7 +1,9 @@
 from dotenv import load_dotenv
+from dotenv import load_dotenv
+import os
 load_dotenv(override=True)
 
-import os
+# print(os.getenv("GROQ_API_KEY"))
 from fastapi import FastAPI, UploadFile, File
 import shutil
 from backend.ingest import ingest_documents
