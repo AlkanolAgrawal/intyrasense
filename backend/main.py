@@ -9,11 +9,20 @@ import shutil
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
 from backend.utils import list_documents
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI(
     title="INTYRASENSE API",
     description="Document-grounded Q&A and summarization API powered by RAG",
     version="1.0.0",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 UPLOAD_DIR = "data/raw_docs"
