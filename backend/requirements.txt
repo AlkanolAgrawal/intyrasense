@@ -10,7 +10,6 @@ langchain-text-splitters
 sentence-transformers
 transformers
 torch
-faiss-cpu
 pytesseract
 pdf2image
 pypdf
@@ -21,3 +20,4 @@ pillow
 beautifulsoup4
 lxml
 requests
+supabase

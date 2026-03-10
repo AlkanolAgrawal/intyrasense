@@ -14,8 +14,7 @@ sentence-transformers
 transformers
 torch
 
-faiss-cpu
-
+supabase
 pytesseract
 pdf2image
 pypdf

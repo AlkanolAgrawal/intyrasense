@@ -1,8 +1,10 @@
 import os
-import shutil
 import torch
 from pdf2image import convert_from_path
 import pytesseract
+
+from backend.models import embeddings
+from backend.supabase_client import supabase
 
 from langchain_core.documents import Document
 from langchain_community.document_loaders import (
@@ -10,35 +12,13 @@ from langchain_community.document_loaders import (
     TextLoader,
     UnstructuredMarkdownLoader
 )
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-# ----------------------------
-# SYSTEM OPTIMIZATION
-# ----------------------------
 torch.set_num_threads(os.cpu_count())
 
-
-# ----------------------------
-# DIRECTORIES
-# ----------------------------
 RAW_DIR = "data/raw_docs"
-INDEX_DIR = "data/faiss_index"
-
-
-# ----------------------------
-# EMBEDDING MODEL (LOAD ONCE)
-# ----------------------------
-embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2",
-    model_kwargs={"device": "cpu"},
-    encode_kwargs={
-        "batch_size": 32,
-        "normalize_embeddings": True
-    }
-)
+INSERT_BATCH = 200
 
 
 # ----------------------------
@@ -46,47 +26,40 @@ embedding_model = HuggingFaceEmbeddings(
 # ----------------------------
 def load_pdf_smart(path, min_text_length=100):
 
-    documents = []
-
     loader = PyPDFLoader(path)
     normal_docs = loader.load()
 
     normal_text = "\n".join(
-        [doc.page_content.strip() for doc in normal_docs]
+        d.page_content.strip() for d in normal_docs
     ).strip()
 
-    # Use native text if meaningful
     if len(normal_text) >= min_text_length:
-        documents.extend(normal_docs)
+        return normal_docs
 
-    # OCR fallback
-    if len(normal_text) < min_text_length:
+    images = convert_from_path(path)
 
-        images = convert_from_path(path)
+    docs = []
 
-        ocr_text = ""
+    for i, img in enumerate(images):
 
-        for img in images:
-            ocr_text += pytesseract.image_to_string(img) + "\n"
+        text = pytesseract.image_to_string(img).strip()
 
-        ocr_text = ocr_text.strip()
-
-        if len(ocr_text) >= min_text_length:
-            documents.append(
+        if text:
+            docs.append(
                 Document(
-                    page_content=ocr_text,
+                    page_content=text,
                     metadata={
                         "source": os.path.basename(path),
-                        "type": "ocr"
+                        "page": i + 1
                     }
                 )
             )
 
-    return documents
+    return docs
 
 
 # ----------------------------
-# LOAD ALL DOCUMENTS
+# LOAD DOCUMENTS
 # ----------------------------
 def load_documents():
 
@@ -124,28 +97,102 @@ def load_documents():
 # ----------------------------
 def ingest_documents():
 
-    # remove old index
-    if os.path.exists(INDEX_DIR):
-        shutil.rmtree(INDEX_DIR)
-
     documents = load_documents()
 
     if not documents:
         print("No documents found.")
         return
 
-    text_splitter = RecursiveCharacterTextSplitter(
+    splitter = RecursiveCharacterTextSplitter(
         chunk_size=2000,
         chunk_overlap=250
     )
 
-    document_chunks = text_splitter.split_documents(documents)
+    chunks = splitter.split_documents(documents)
 
-    vector_store = FAISS.from_documents(
-        document_chunks,
-        embedding_model
-    )
+    print(f"Processing {len(chunks)} chunks...")
 
-    vector_store.save_local(INDEX_DIR)
+    texts = []
+    sources = []
+    pages = []
+    
+    for chunk in chunks:
 
-    print(f"Ingested {len(document_chunks)} chunks.")
+        text = chunk.page_content.strip()
+
+        if not text:
+            continue
+
+        texts.append(text)
+        sources.append(chunk.metadata.get("source", "unknown"))
+        pages.append(chunk.metadata.get("page", 1))
+    # ----------------------------
+    # CREATE EMBEDDINGS
+    # ----------------------------
+    vectors = embeddings().embed_documents(texts)
+    
+    # ----------------------------
+    # DOCUMENT IDS
+    # ----------------------------
+    doc_id_map = {}
+
+    unique_docs = set(sources)
+
+    for doc in unique_docs:
+
+        ext = doc.split(".")[-1]
+
+        res = supabase.table("documents") \
+            .select("id") \
+            .eq("name", doc) \
+            .execute()
+
+        if res.data:
+            doc_id = res.data[0]["id"]
+
+        else:
+            res = supabase.table("documents").insert({
+                "name": doc,
+                "type": ext
+            }).execute()
+
+            doc_id = res.data[0]["id"]
+
+        doc_id_map[doc] = doc_id
+
+        # delete previous chunks for re-ingest
+        (
+        supabase.table("chunks")
+        .delete()
+        .eq("source", doc_id)
+        .execute()
+        )
+    # ----------------------------
+    # BUILD CHUNK RECORDS
+    # ----------------------------
+    records = []
+
+    for text, vector, source, page in zip(
+        texts,
+        vectors,
+        sources,
+        pages
+    ):
+
+        records.append({
+            "source": doc_id_map[source],
+            "page": page,
+            "text": text,
+            "embedding": vector
+        })
+
+    # ----------------------------
+    # BATCH INSERT
+    # ----------------------------
+    for i in range(0, len(records), INSERT_BATCH):
+
+        batch = records[i:i + INSERT_BATCH]
+
+        supabase.table("chunks").insert(batch).execute()
+
+    print(f"Ingested {len(records)} chunks into Supabase.")

@@ -7,8 +7,19 @@ import os
 
 RAW_DIR = "data/raw_docs"
 
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
+
+
 def list_documents():
     if not os.path.exists(RAW_DIR):
         return []
-        # Return sorted list of filenames
-    return sorted(os.listdir(RAW_DIR))
+
+    files = []
+
+    for f in os.listdir(RAW_DIR):
+        ext = os.path.splitext(f)[1].lower()
+
+        if ext in ALLOWED_EXTENSIONS:
+            files.append(f)
+
+    return sorted(files)
