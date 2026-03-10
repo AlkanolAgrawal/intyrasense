@@ -1,9 +1,10 @@
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-
+import os
 INDEX_DIR = "data/faiss_index"
 
-
+if not os.path.exists(INDEX_DIR):
+    os.makedirs(INDEX_DIR, exist_ok=True)
 # ----------------------------
 # EMBEDDINGS (LOAD ONCE)
 # ----------------------------
