@@ -1,15 +1,20 @@
 from dotenv import load_dotenv
-from dotenv import load_dotenv
 import os
+
 load_dotenv(override=True)
 
-# print(os.getenv("GROQ_API_KEY"))
 from fastapi import FastAPI, UploadFile, File
 import shutil
+
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
 from backend.utils import list_documents
-app = FastAPI()
+
+app = FastAPI(
+    title="INTYRASENSE API",
+    description="Document-grounded Q&A and summarization API powered by RAG",
+    version="1.0.0",
+)
 
 UPLOAD_DIR = "data/raw_docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -22,6 +27,8 @@ class QueryRequest(BaseModel):
 
 class SummarizeRequest(BaseModel):
     document: str
+
+
 @app.post("/upload")
 async def upload_docs(files: list[UploadFile] = File(...)):
     """

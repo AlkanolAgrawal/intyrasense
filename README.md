@@ -1,309 +1,286 @@
+<div align="center">
+
 # 🧠 INTYRASENSE
 
-**INTYRASENSE** is a Retrieval-Augmented Generation (RAG) system that provides document-grounded question answering and summarization. The system maintains strict adherence to source documents, never hallucinating or using external knowledge.
+**Document-Grounded Question Answering & Summarization powered by RAG**
 
-## ✨ Features
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://langchain.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-- 📄 **Multi-Format Document Support**: Upload and process PDF, Markdown, and text files
-- 🔍 **Semantic Search**: Uses sentence transformers and FAISS for efficient vector similarity search
-- 💬 **Context-Aware Q&A**: Maintains chat history and rewrites follow-up questions for better context
-- 📝 **Document Summarization**: Generate concise summaries of uploaded documents
-- 🎯 **Confidence Scoring**: Each answer includes a confidence score based on retrieval quality
-- 📌 **Source Citations**: All answers include references to source documents and page numbers
-- 🔒 **Strict RAG**: Only answers from document content, explicitly states when information is not found
-- 🔄 **Document Filtering**: Query specific documents or search across all uploaded files
+<p align="center">
+  <em>A strict Retrieval-Augmented Generation system that answers questions <strong>only</strong> from your uploaded documents — no hallucination, no external knowledge.</em>
+</p>
 
-## 🏗️ Architecture
-
-### Backend (FastAPI)
-- **main.py**: FastAPI server with upload, query, and summarization endpoints
-- **ingest.py**: Document loading, chunking, and FAISS index creation
-- **qa.py**: Question answering and summarization logic using LangChain
-- **retriever.py**: Vector store retrieval with optional document filtering
-- **prompts.py**: System prompts for Q&A and summarization
-- **utils.py**: Helper functions for document management
-
-### Frontend (Streamlit)
-- **app.py**: Interactive web interface for document upload, Q&A, and summarization
-
-### Data Storage
-- **data/raw_docs/**: Stores uploaded documents
-- **data/faiss_index/**: Vector embeddings index for semantic search
-
-## 🔧 Technology Stack
-
-- **FastAPI**: Backend REST API
-- **Streamlit**: Frontend web interface
-- **LangChain**: RAG orchestration framework
-- **FAISS**: Facebook AI Similarity Search for vector storage
-- **HuggingFace**: Sentence transformers for embeddings (all-MiniLM-L6-v2)
-- **Groq**: LLM inference (llama-3.1-8b-instant)
-- **PyPDF**: PDF document parsing
-- **Unstructured**: Markdown and text processing
-
-## 📋 Prerequisites
-
-- Python 3.8+
-- Groq API key (for LLM inference)
-
-## 🚀 Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd intyrasense
-   ```
-
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**:
-   Create a `.env` file in the project root:
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   ```
-
-## 🎯 Usage
-
-### Starting the Application
-
-1. **Start the backend server**:
-   ```bash
-   uvicorn backend.main:app --reload
-   ```
-   The API will be available at `http://127.0.0.1:8000`
-
-2. **Start the frontend** (in a new terminal):
-   ```bash
-   streamlit run frontend/app.py
-   ```
-   The web interface will open at `http://localhost:8501`
-
-### Using the Interface
-
-1. **Upload Documents**:
-   - Click "Browse files" to select PDF, Markdown, or text files
-   - Click "Upload & Index" to process and index the documents
-   - Wait for the indexing process to complete
-
-2. **Ask Questions**:
-   - Type your question in the chat input
-   - The system will search the documents and provide an answer with:
-     - The answer text
-     - Source citations (document and page number)
-     - Confidence score (0.0 to 1.0)
-
-3. **Summarize Documents**:
-   - Select a specific document from the dropdown
-   - Click "Summarize Document" to generate a summary
-   - View the summary with source citations
-
-4. **Document Filtering**:
-   - Use the "Select Document" dropdown to filter queries
-   - Choose "All Documents" to search across all files
-   - Select a specific document to limit the search scope
-
-## 🔌 API Endpoints
-
-### POST `/upload`
-Upload and index documents.
-
-**Request**:
-- Form data with `files` (multipart/form-data)
-- Accepts: PDF, Markdown (.md), Text (.txt)
-
-**Response**:
-```json
-{
-  "status": "Index rebuilt successfully"
-}
-```
-
-### POST `/query`
-Ask questions about documents.
-
-**Request**:
-```json
-{
-  "question": "What is the main topic?",
-  "chat_history": [["Previous question", "Previous answer"]],
-  "document": "filename.pdf"  // optional, null for all documents
-}
-```
-
-**Response**:
-```json
-{
-  "answer": "The answer text based on document content",
-  "citations": ["filename.pdf | page 5"],
-  "confidence": 0.85
-}
-```
-
-### POST `/summarize`
-Generate document summary.
-
-**Request**:
-```json
-{
-  "document": "filename.pdf"  // optional
-}
-```
-
-**Response**:
-```json
-{
-  "summary": "Document summary text",
-  "citations": ["filename.pdf | page 1", "filename.pdf | page 2"]
-}
-```
-
-### GET `/documents`
-List all uploaded documents.
-
-**Response**:
-```json
-{
-  "documents": ["doc1.pdf", "doc2.md", "doc3.txt"]
-}
-```
-
-## 📊 How It Works
-
-### Document Ingestion Pipeline
-1. **Upload**: Documents are saved to `data/raw_docs/`
-2. **Loading**: Documents are loaded using appropriate loaders (PyPDF, TextLoader, etc.)
-3. **Chunking**: Text is split into overlapping chunks (800 chars, 100 char overlap)
-4. **Embedding**: Chunks are embedded using sentence transformers
-5. **Indexing**: Embeddings are stored in FAISS vector database
-
-### Question Answering Pipeline
-1. **Question Rewriting**: Follow-up questions are rewritten using chat history for context
-2. **Retrieval**: Top-k most similar document chunks are retrieved from FAISS
-3. **Confidence Calculation**: Average similarity distance is converted to confidence score
-4. **Answer Generation**: LLM generates answer using retrieved context and strict system prompt
-5. **Citation Extraction**: Source documents and page numbers are extracted from metadata
-
-### Confidence Scoring
-```
-confidence = max(0.0, min(1.0, 1 / (1 + average_distance)))
-```
-- Higher confidence (closer to 1.0) = more relevant retrieved chunks
-- Lower confidence (< 0.25) = answer rejected, returns "Not found"
-- Confidence reflects retrieval quality, not answer correctness
-
-## 🔒 Design Principles
-
-### Strict RAG Approach
-- **No External Knowledge**: System only uses uploaded document content
-- **Explicit Uncertainty**: Clearly states when information is not found
-- **No Hallucination**: Refuses to guess or make up information
-- **Source Attribution**: All answers include citations to source documents
-
-### Privacy & Security
-- All processing happens locally (except LLM API calls to Groq)
-- Documents are stored locally in `data/` directory
-- No data is permanently stored on external servers
-
-## 🛠️ Configuration
-
-### Embedding Model
-Change in [retriever.py](backend/retriever.py) and [ingest.py](backend/ingest.py):
-```python
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
-```
-
-### LLM Model
-Change in [qa.py](backend/qa.py):
-```python
-llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    temperature=0
-)
-```
-
-### Chunk Size
-Change in [ingest.py](backend/ingest.py):
-```python
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,
-    chunk_overlap=100
-)
-```
-
-### Retrieval Count
-Change in [retriever.py](backend/retriever.py):
-```python
-search_kwargs={"k": 4}  # Number of chunks to retrieve
-```
-
-## 📁 Project Structure
-
-```
-intyrasense/
-├── README.md                 # This file
-├── requirements.txt          # Python dependencies
-├── .env                      # Environment variables (API keys)
-├── backend/                  # Backend API
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application
-│   ├── ingest.py            # Document processing & indexing
-│   ├── qa.py                # Q&A and summarization logic
-│   ├── retriever.py         # Vector store retrieval
-│   ├── prompts.py           # System prompts
-│   └── utils.py             # Helper functions
-├── frontend/                 # Frontend UI
-│   └── app.py               # Streamlit application
-└── data/                     # Data storage
-    ├── raw_docs/            # Uploaded documents
-    └── faiss_index/         # Vector embeddings index
-```
-
-## 🐛 Troubleshooting
-
-### "Backend not reachable"
-- Ensure backend is running: `uvicorn backend.main:app --reload`
-- Check that it's running on `http://127.0.0.1:8000`
-
-### "Not found in internal documents"
-- Verify documents are uploaded and indexed
-- Check confidence score - may need better matching documents
-- Try rephrasing your question
-
-### Import errors
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Activate your virtual environment
-
-### Low confidence scores
-- Upload more relevant documents
-- Try more specific questions
-- Check document quality and relevance
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-## 📄 License
-
-This project is provided as-is for educational and commercial use.
-
-## 🙏 Acknowledgments
-
-- Built with [LangChain](https://langchain.com/)
-- Powered by [Groq](https://groq.com/) LLM inference
-- Uses [FAISS](https://github.com/facebookresearch/faiss) for vector search
-- Embeddings from [Sentence Transformers](https://www.sbert.net/)
+</div>
 
 ---
 
-**Made with ❤️ for accurate, source-grounded information retrieval**
+## 📸 Demo
+
+> **Screenshots coming soon** — contributions welcome!
+
+<!-- Uncomment when screenshots are available:
+<div align="center">
+  <img src="docs/assets/screenshot-upload.png" alt="Upload Interface" width="45%">
+  <img src="docs/assets/screenshot-chat.png" alt="Chat Interface" width="45%">
+</div>
+-->
+
+---
+
+## 🏗️ Architecture
+
+```text
+┌──────────────┐        HTTP         ┌──────────────────────────────┐
+│   Streamlit  │ ◄──────────────────►│         FastAPI Backend      │
+│   Frontend   │    REST API calls   │                              │
+│  (port 8501) │                     │  ┌────────┐  ┌───────────┐  │
+└──────────────┘                     │  │ Ingest │  │ Retriever │  │
+                                     │  │Pipeline│  │  (FAISS)  │  │
+                                     │  └───┬────┘  └─────┬─────┘  │
+                                     │      │             │        │
+                                     │  ┌───▼─────────────▼─────┐  │
+                                     │  │   QA / Summarization  │  │
+                                     │  │   (LangChain + Groq)  │  │
+                                     │  └───────────────────────┘  │
+                                     └──────────────┬──────────────┘
+                                                    │
+                                     ┌──────────────▼──────────────┐
+                                     │       Data Layer            │
+                                     │  📄 raw_docs/  (uploads)   │
+                                     │  🗂️  faiss_index/ (vectors) │
+                                     └─────────────────────────────┘
+```
+
+> For a detailed architecture breakdown, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 📄 **Multi-Format Upload** | Supports PDF, Markdown, and plain text files |
+| 🔍 **Semantic Search** | FAISS + sentence-transformers for fast vector similarity |
+| 💬 **Context-Aware Q&A** | Rewrites follow-up questions using chat history |
+| 📝 **Document Summarization** | Hierarchical summarization for large documents |
+| 🎯 **Confidence Scoring** | Every answer includes a retrieval confidence score |
+| 📌 **Source Citations** | References source files and page numbers |
+| 🔒 **Strict RAG** | Never halluccinates — says "not found" when unsure |
+| 🔄 **Document Filtering** | Query a single document or search across all |
+| 🖼️ **OCR Fallback** | Extracts text from scanned PDFs via Tesseract |
+
+---
+
+## 🔧 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Backend API** | [FastAPI](https://fastapi.tiangolo.com) |
+| **Frontend** | [Streamlit](https://streamlit.io) |
+| **RAG Framework** | [LangChain](https://langchain.com) |
+| **Vector Store** | [FAISS](https://github.com/facebookresearch/faiss) (Facebook AI Similarity Search) |
+| **Embeddings** | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) via HuggingFace |
+| **LLM** | [Groq](https://groq.com) — Llama 3.1 8B Instant |
+| **PDF Parsing** | PyPDF + Tesseract OCR fallback |
+| **Containerization** | Docker & Docker Compose |
+
+---
+
+## 📁 Project Structure
+
+```text
+intyrasense/
+├── backend/
+│   ├── __init__.py
+│   ├── main.py             # FastAPI app — upload, query, summarize endpoints
+│   ├── ingest.py           # Document loading, chunking, FAISS index creation
+│   ├── qa.py               # Question answering & summarization logic
+│   ├── retriever.py        # Vector store retrieval with filtering
+│   ├── prompts.py          # System prompts for Q&A and summarization
+│   ├── utils.py            # Helper functions (document listing)
+│   └── requirements.txt    # Backend Python dependencies
+├── frontend/
+│   ├── app.py              # Streamlit web interface
+│   └── requirements.txt    # Frontend Python dependencies
+├── data/
+│   ├── raw_docs/           # Uploaded source documents
+│   └── faiss_index/        # Generated FAISS vector index
+├── Docker/
+│   ├── docker-compose.yml  # Multi-container orchestration
+│   ├── Dockerfile.backend  # Backend container image
+│   └── Dockerfile.frontend # Frontend container image
+├── docs/
+│   ├── ARCHITECTURE.md     # Detailed architecture documentation
+│   ├── SETUP.md            # Step-by-step setup guide
+│   └── DEPLOYMENT.md       # Deployment instructions
+├── .env.example            # Environment variable template
+├── .gitignore
+├── Makefile                # Developer shortcuts
+├── LICENSE
+├── requirements.txt        # Root-level dependencies
+└── README.md
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python 3.11+**
+- **Groq API key** — [get one free](https://console.groq.com)
+- **Tesseract OCR** *(optional, for scanned PDFs)*
+- **Docker & Docker Compose** *(optional, for containerized setup)*
+
+### Option 1: Local Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/<your-username>/intyrasense.git
+cd intyrasense
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY
+```
+
+**Start the application:**
+
+```bash
+# Terminal 1 — Backend
+uvicorn backend.main:app --reload
+
+# Terminal 2 — Frontend
+streamlit run frontend/app.py
+```
+
+| Service | URL |
+|---------|-----|
+| Backend API | http://127.0.0.1:8000 |
+| API Docs (Swagger) | http://127.0.0.1:8000/docs |
+| Frontend | http://localhost:8501 |
+
+### Option 2: Docker
+
+```bash
+# Configure environment
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY
+
+# Build and start all services
+docker compose -f Docker/docker-compose.yml up --build
+```
+
+> See [docs/SETUP.md](docs/SETUP.md) for detailed installation instructions and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for production deployment.
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GROQ_API_KEY` | **Yes** | — | API key for Groq LLM inference |
+| `BACKEND_URL` | No | `http://127.0.0.1:8000` | Backend URL (used by frontend) |
+
+Create a `.env` file from the template:
+
+```bash
+cp .env.example .env
+```
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | Description | Request Body |
+|--------|----------|-------------|-------------|
+| `POST` | `/upload` | Upload & index documents | `multipart/form-data` — `files` |
+| `POST` | `/query` | Ask a question | `{"question": "...", "chat_history": [], "document": null}` |
+| `POST` | `/summarize` | Summarize a document | `{"document": "filename.pdf"}` |
+| `GET` | `/documents` | List indexed documents | — |
+
+### Example: Query
+
+```bash
+curl -X POST http://127.0.0.1:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the main topic?", "chat_history": [], "document": null}'
+```
+
+**Response:**
+
+```json
+{
+  "answer": "The main topic is ...",
+  "citations": ["document.pdf | page 3"],
+  "confidence": 0.87
+}
+```
+
+### Example: Upload
+
+```bash
+curl -X POST http://127.0.0.1:8000/upload \
+  -F "files=@path/to/document.pdf"
+```
+
+### Example: Summarize
+
+```bash
+curl -X POST http://127.0.0.1:8000/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"document": "document.pdf"}'
+```
+
+---
+
+## 🧑‍💻 Usage
+
+1. **Upload Documents** — Use the sidebar to upload PDF, Markdown, or text files. Click **"Upload & Index"** to process them.
+2. **Select Scope** — Choose a specific document or search across all uploads.
+3. **Ask Questions** — Type fact-based questions in the chat. The system retrieves relevant chunks, scores confidence, and cites sources.
+4. **Summarize** — Select a document and click **"Summarize Document"** for a concise overview.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/my-feature`
+3. **Commit** your changes: `git commit -m "feat: add my feature"`
+4. **Push** to the branch: `git push origin feature/my-feature`
+5. **Open** a Pull Request
+
+Please follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👤 Author
+
+**Alkanol** — [GitHub](https://github.com/alkanol)
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ using LangChain, FastAPI, and Streamlit</sub>
+</div>
