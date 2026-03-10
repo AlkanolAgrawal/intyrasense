@@ -1,25 +1,15 @@
-"""
-Utility Functions
-Helper functions for document management and file operations.
-"""
-
-import os
-
-RAW_DIR = "data/raw_docs"
-
-ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
-
+from backend.supabase_client import supabase
 
 def list_documents():
-    if not os.path.exists(RAW_DIR):
+
+    res = (
+        supabase
+        .table("documents")
+        .select("name")
+        .execute()
+    )
+
+    if not res.data:
         return []
 
-    files = []
-
-    for f in os.listdir(RAW_DIR):
-        ext = os.path.splitext(f)[1].lower()
-
-        if ext in ALLOWED_EXTENSIONS:
-            files.append(f)
-
-    return sorted(files)
+    return sorted([doc["name"] for doc in res.data])

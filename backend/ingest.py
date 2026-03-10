@@ -1,5 +1,6 @@
 import os
 import torch
+import tempfile
 from pdf2image import convert_from_path
 import pytesseract
 
@@ -17,8 +18,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 torch.set_num_threads(os.cpu_count())
 
-RAW_DIR = "data/raw_docs"
 INSERT_BATCH = 200
+BUCKET_NAME = "documents"
 
 
 # ----------------------------
@@ -59,33 +60,43 @@ def load_pdf_smart(path, min_text_length=100):
 
 
 # ----------------------------
-# LOAD DOCUMENTS
+# LOAD DOCUMENTS FROM BUCKET
 # ----------------------------
 def load_documents():
 
     docs = []
 
-    if not os.path.exists(RAW_DIR):
-        return docs
+    files = supabase.storage.from_(BUCKET_NAME).list()
 
-    for file in os.listdir(RAW_DIR):
+    for f in files:
 
-        path = os.path.join(RAW_DIR, file)
+        filename = f["name"]
 
-        if file.endswith(".pdf"):
+        print(f"Downloading {filename}...")
+
+        file_bytes = supabase.storage.from_(BUCKET_NAME).download(filename)
+
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+
+        tmp.write(file_bytes)
+        tmp.close()
+
+        path = tmp.name
+
+        if filename.endswith(".pdf"):
             loaded = load_pdf_smart(path)
 
-        elif file.endswith(".md"):
+        elif filename.endswith(".md"):
             loaded = UnstructuredMarkdownLoader(path).load()
 
-        elif file.endswith(".txt"):
+        elif filename.endswith(".txt"):
             loaded = TextLoader(path).load()
 
         else:
             continue
 
         for d in loaded:
-            d.metadata["source"] = file
+            d.metadata["source"] = filename
 
         docs.extend(loaded)
 
@@ -115,7 +126,7 @@ def ingest_documents():
     texts = []
     sources = []
     pages = []
-    
+
     for chunk in chunks:
 
         text = chunk.page_content.strip()
@@ -126,11 +137,12 @@ def ingest_documents():
         texts.append(text)
         sources.append(chunk.metadata.get("source", "unknown"))
         pages.append(chunk.metadata.get("page", 1))
+
     # ----------------------------
     # CREATE EMBEDDINGS
     # ----------------------------
     vectors = embeddings().embed_documents(texts)
-    
+
     # ----------------------------
     # DOCUMENT IDS
     # ----------------------------
@@ -142,10 +154,12 @@ def ingest_documents():
 
         ext = doc.split(".")[-1]
 
-        res = supabase.table("documents") \
-            .select("id") \
-            .eq("name", doc) \
+        res = (
+            supabase.table("documents")
+            .select("id")
+            .eq("name", doc)
             .execute()
+        )
 
         if res.data:
             doc_id = res.data[0]["id"]
@@ -162,11 +176,12 @@ def ingest_documents():
 
         # delete previous chunks for re-ingest
         (
-        supabase.table("chunks")
-        .delete()
-        .eq("source", doc_id)
-        .execute()
+            supabase.table("chunks")
+            .delete()
+            .eq("source", doc_id)
+            .execute()
         )
+
     # ----------------------------
     # BUILD CHUNK RECORDS
     # ----------------------------
@@ -183,7 +198,7 @@ def ingest_documents():
             "source": doc_id_map[source],
             "page": page,
             "text": text,
-            "embedding": vector
+            "embedding": vector.tolist()
         })
 
     # ----------------------------
