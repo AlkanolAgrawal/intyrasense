@@ -21,7 +21,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 torch.set_num_threads(os.cpu_count())
 
-INSERT_BATCH = 200
+INSERT_BATCH = 1000
 BUCKET_NAME = "documents"
 
 
@@ -32,7 +32,6 @@ def load_pdf_smart(path, min_text_length=100):
 
     loader = PyPDFLoader(path)
     normal_docs = loader.load()
-
     normal_text = "\n".join(
         d.page_content.strip() for d in normal_docs
     ).strip()
@@ -159,9 +158,8 @@ def load_documents():
 # ----------------------------
 # PARALLEL EMBEDDING
 # -----------------------------
+model = embeddings()
 def embed_parallel(texts, batch_size=64, workers=4):
-
-    model = embeddings()
 
     batches = [
         texts[i:i + batch_size]
@@ -208,7 +206,7 @@ def ingest_documents():
 
         text = chunk.page_content.strip()
 
-        if not text:
+        if len(text) < 20:
             continue
 
         texts.append(text)
@@ -218,47 +216,10 @@ def ingest_documents():
     # ----------------------------
     # CREATE EMBEDDINGS
     # ----------------------------
+    if not texts:
+        print("No valid chunks.")
+        return
     vectors = embed_parallel(texts)
-
-    # ----------------------------
-    # DOCUMENT IDS
-    # ----------------------------
-    doc_id_map = {}
-
-    unique_docs = set(sources)
-
-    for doc in unique_docs:
-
-        ext = doc.split(".")[-1]
-
-        res = (
-            supabase.table("documents")
-            .select("id")
-            .eq("name", doc)
-            .execute()
-        )
-
-        if res.data:
-            doc_id = res.data[0]["id"]
-
-        else:
-            res = supabase.table("documents").insert({
-                "name": doc,
-                "type": ext
-            }).execute()
-
-            doc_id = res.data[0]["id"]
-
-        doc_id_map[doc] = doc_id
-
-        # delete previous chunks for re-ingest
-        (
-            supabase.table("chunks")
-            .delete()
-            .eq("source", doc_id)
-            .execute()
-        )
-
     # ----------------------------
     # BUILD CHUNK RECORDS
     # ----------------------------
@@ -272,7 +233,7 @@ def ingest_documents():
     ):
 
         records.append({
-            "source": doc_id_map[source],
+            "source": source,
             "page": page,
             "text": text,
             "embedding": vector.tolist()
@@ -285,6 +246,9 @@ def ingest_documents():
 
         batch = records[i:i + INSERT_BATCH]
 
-        supabase.table("chunks").insert(batch).execute()
+        try:
+            supabase.table("chunks").insert(batch).execute()
+        except Exception as e:
+            print("Insert error:", e)
 
     print(f"Ingested {len(records)} chunks into Supabase.")

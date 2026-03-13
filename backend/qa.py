@@ -19,6 +19,7 @@ def rewrite_question(chat_history, question):
     )
 
     prompt = f"""
+
 Rewrite the follow-up question so it is fully self-contained.
 
 Conversation:
