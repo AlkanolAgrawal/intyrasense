@@ -1,16 +1,14 @@
 import os
 import uuid
-import shutil
 import threading
 import warnings
-warnings.filterwarnings("ignore")
 import logging
-logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
-logging.getLogger("transformers").setLevel(logging.ERROR)
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from supabase import create_client
+from backend.utils import ingestion_status
 
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
@@ -20,16 +18,17 @@ from backend.utils import list_documents
 # ---------------------------------
 # ENV + LOGGING
 # ---------------------------------
+warnings.filterwarnings("ignore")
+logging.basicConfig(level=logging.INFO)
 load_dotenv(override=True)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------------------------------
 # APP INIT
 # ---------------------------------
-app = FastAPI(
-    title="INTYRASENSE API",
-    description="Document-grounded Q&A and summarization API powered by RAG",
-    version="1.0.0"
-)
+app = FastAPI(debug=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,11 +40,9 @@ app.add_middleware(
 
 
 # ---------------------------------
-# STORAGE
+# CONFIG
 # ---------------------------------
-UPLOAD_DIR = "data/raw_docs"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+BUCKET_NAME = "documents"
 ALLOWED_EXT = {".pdf", ".md", ".txt"}
 
 
@@ -57,73 +54,88 @@ class QueryRequest(BaseModel):
     chat_history: list = []
     document: str | None = None
 
-
 class SummarizeRequest(BaseModel):
-    document: str
-
+    document: str | None = None
 
 # ---------------------------------
-# HEALTH CHECK
+# HEALTH
 # ---------------------------------
 @app.get("/")
 def health():
     return {"status": "running"}
-
-
+# ---------------------------------
+# DOCUMENT Ingestion Status
+# ---------------------------------
+@app.get("/ingestion-status")
+def ingestion_status_api():
+    return {"state": ingestion_status["state"]}
 # ---------------------------------
 # DOCUMENT UPLOAD
 # ---------------------------------
 @app.post("/upload")
 async def upload_documents(files: list[UploadFile] = File(...)):
 
-    saved_files = []
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded")
+
+    bucket = supabase.storage.from_(BUCKET_NAME)
+    uploaded_files = []
 
     for file in files:
 
         ext = os.path.splitext(file.filename)[1].lower()
 
         if ext not in ALLOWED_EXT:
-            return {"error": f"Unsupported file type: {ext}"}
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
-        unique_name = f"{uuid.uuid4()}_{file.filename}"
+        try:
+            file_bytes = await file.read()
 
-        path = os.path.join(UPLOAD_DIR, unique_name)
+            unique_name = f"{uuid.uuid4()}_{file.filename}"
 
-        with open(path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            bucket.upload(
+                path=unique_name,
+                file=file_bytes,
+                file_options={"upsert": "true"}
+            )
+            uploaded_files.append(unique_name)
 
-        saved_files.append(unique_name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-    # run ingestion in background
-    threading.Thread(target=ingest_documents).start()
+    threading.Thread(
+        target=ingest_documents,
+        args=(uploaded_files,),
+        daemon=True
+    ).start()
 
     return {
         "status": "upload_successful",
-        "files": saved_files
+        "files": uploaded_files
     }
-
-
 # ---------------------------------
 # QUESTION ANSWERING
 # ---------------------------------
 @app.post("/query")
 async def query_documents(req: QueryRequest):
 
-    result = answer_question(
+    if not req.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty"
+        )
+
+    return answer_question(
         question=req.question,
         chat_history=req.chat_history,
         document=req.document
     )
 
-    return result
-
-
 # ---------------------------------
-# DOCUMENT SUMMARIZATION
-# ---------------------------------
+# SUMMARIZE
+# --------------------------------- 
 @app.post("/summarize")
 async def summarize_document(req: SummarizeRequest):
-
     return summarize_documents(req.document)
 
 

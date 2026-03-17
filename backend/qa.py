@@ -7,6 +7,29 @@ from backend.prompts import SYSTEM_PROMPT, SUMMARY_PROMPT
 
 
 # ---------------------------------
+# HELPER: GET DOCUMENT NAME
+# ---------------------------------
+def get_document_name(doc_id):
+
+    try:
+        res = (
+            supabase.table("documents")
+            .select("name")
+            .eq("id", doc_id)
+            .single()
+            .execute()
+        )
+
+        if res.data:
+            return res.data["name"]
+
+    except Exception:
+        pass
+
+    return "unknown"
+
+
+# ---------------------------------
 # QUESTION REWRITE
 # ---------------------------------
 def rewrite_question(chat_history, question):
@@ -19,7 +42,6 @@ def rewrite_question(chat_history, question):
     )
 
     prompt = f"""
-
 Rewrite the follow-up question so it is fully self-contained.
 
 Conversation:
@@ -39,7 +61,9 @@ Standalone question:
 # ---------------------------------
 # RAG QUESTION ANSWERING
 # ---------------------------------
-def answer_question(question: str, chat_history: list, document: str | None):
+def answer_question(question: str, chat_history: list, document=None):
+    if document:
+        document = document.split("_",1)[0]
 
     standalone_question = rewrite_question(chat_history, question)
 
@@ -55,7 +79,6 @@ def answer_question(question: str, chat_history: list, document: str | None):
             "confidence": 0.0
         }
 
-    # limit to top chunks
     retrieved = retrieved[:5]
 
     context_chunks = []
@@ -64,16 +87,18 @@ def answer_question(question: str, chat_history: list, document: str | None):
 
     for row in retrieved:
 
-        content = row.get("content")
-        similarity = row.get("similarity", 0)
-        doc_name = row.get("document_name")
+        content = row.get("text")
+        similarity = row.get("score", 0)
+        doc_id = row.get("source")
+        page = row.get("page")
 
         if content:
             context_chunks.append(content)
             similarities.append(similarity)
 
-        if doc_name:
-            citations.append(doc_name)
+        if doc_id:
+            book_name = get_document_name(doc_id)
+            citations.append(f"{book_name} (page {page})")
 
     if not context_chunks:
         return {
@@ -82,7 +107,7 @@ def answer_question(question: str, chat_history: list, document: str | None):
             "confidence": 0.0
         }
 
-    # compute confidence
+    # confidence score
     confidence = sum(similarities) / len(similarities)
     confidence = max(0.0, min(1.0, float(confidence)))
 
@@ -113,14 +138,18 @@ def answer_question(question: str, chat_history: list, document: str | None):
 # ---------------------------------
 # DOCUMENT SUMMARIZATION
 # ---------------------------------
-def summarize_documents(document: str | None = None):
 
+def summarize_documents(document=None):
+   
+    if document and "_" in document:
+        document = document.split("_",1)[0]
+    print("Summarizing document:", document)
     query = supabase.table("chunks").select(
-        "content, document_name"
+        "text, source"
     )
 
     if document:
-        query = query.eq("document_name", document)
+        query = query.eq("source", document)
 
     response = query.execute()
 
@@ -130,11 +159,10 @@ def summarize_documents(document: str | None = None):
             "citations": []
         }
 
-    # extract chunks
     chunks = [
-        row["content"]
+        row["text"]
         for row in response.data
-        if row.get("content")
+        if row.get("text")
     ]
 
     if not chunks:
@@ -143,7 +171,7 @@ def summarize_documents(document: str | None = None):
             "citations": []
         }
 
-    # limit context size (important for speed)
+    # limit context for LLM
     chunks = chunks[:15]
 
     context = "\n\n".join(chunks)
@@ -152,13 +180,13 @@ def summarize_documents(document: str | None = None):
 
     result = llm().invoke(prompt)
 
-    citations = list({
-        row["document_name"]
-        for row in response.data
-        if row.get("document_name")
-    })
+    citations = []
+
+    for row in response.data:
+        if row.get("source"):
+            citations.append(get_document_name(row["source"]))
 
     return {
         "summary": result.content.strip(),
-        "citations": citations
+        "citations": list(set(citations))
     }

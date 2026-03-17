@@ -1,33 +1,34 @@
 from functools import lru_cache
-
 from backend.supabase_client import supabase
 from backend.models import embeddings
 
+model = embeddings()
 
-# ---------------------------------
-# EMBEDDING CACHE
-# ---------------------------------
+
+# -----------------------------
+# CACHE QUERY EMBEDDINGS
+# -----------------------------
 @lru_cache(maxsize=256)
 def embed_query_cached(text: str):
-    return embeddings().embed_query(text)
+
+    text = text.strip().lower()
+
+    return model.embed_query(text)
 
 
-# ---------------------------------
-# VECTOR RETRIEVAL
-# ---------------------------------
-def retrieve_with_score(query: str, document: str | None = None):
+# -----------------------------
+# RETRIEVE CHUNKS
+# -----------------------------
+def retrieve_with_score(query: str, document=None, k: int = 10):
 
     try:
-
-        # create query embedding
-        query_embedding = embed_query_cached(query)
-
+        query_embedding = list(embed_query_cached(query))
+        
         params = {
             "query_embedding": query_embedding,
-            "match_count": 6
+            "match_count": k
         }
 
-        # optional document filter
         if document:
             params["document_filter"] = document
 
@@ -39,7 +40,18 @@ def retrieve_with_score(query: str, document: str | None = None):
         if not response.data:
             return []
 
-        return response.data
+        results = []
+
+        for r in response.data:
+
+            results.append({
+                "text": r.get("text"),
+                "source": r.get("source"),     # document id
+                "page": r.get("page", 1),
+                "score": r.get("similarity")
+            })
+
+        return results
 
     except Exception as e:
 
