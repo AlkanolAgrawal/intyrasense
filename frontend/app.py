@@ -25,7 +25,6 @@ def get_documents():
     try:
         r = requests.get(f"{BACKEND_URL}/documents", timeout=5)
         if r.status_code == 200:
-
             return r.json().get("documents", [])
     except:
         pass
@@ -130,16 +129,11 @@ if st.button("Upload & Index"):
 
 st.divider()
 st.header("📂 Select Document")
-
 docs = get_documents()
-
+# print("Fetched documents:", docs)
 doc_map = {}
-
 for d in docs:
-    name = d["name"]
-    if "_" in name:
-        clean = name.split("_", 1)[1]
-        doc_map[clean] = name 
+    doc_map[d["name"]] = d["storage_path"] 
 
 options = ["All Documents"] + list(doc_map.keys())
 
@@ -147,10 +141,11 @@ selected_name = st.selectbox(
     "Choose document scope:",
     options
 )
-
+# print(doc_map)
 selected_document = None
 if selected_name != "All Documents":
     selected_document = doc_map[selected_name]
+print("Selected document path:", selected_document)
 # ==============================
 # SUMMARIZATION
 # ==============================
@@ -165,13 +160,12 @@ if st.button("Summarize Document"):
 
     try:
         with st.spinner("Generating summary..."):
-
+            print("Selected document:", selected_document)
             r = requests.post(
                 f"{BACKEND_URL}/summarize",
-                json={"document": selected_document},
+                json={"document": selected_document}, #doc_id gone
                 timeout=60
             )
-
         if r.status_code == 200:
 
             data = r.json()

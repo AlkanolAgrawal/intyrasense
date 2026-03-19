@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-
+from backend.utils import get_doc_id_from_name
 from backend.models import llm
 from backend.supabase_client import supabase
 from backend.retriever import retrieve_with_score
@@ -62,14 +62,12 @@ Standalone question:
 # RAG QUESTION ANSWERING
 # ---------------------------------
 def answer_question(question: str, chat_history: list, document=None):
-    if document:
-        document = document.split("_",1)[0]
-
     standalone_question = rewrite_question(chat_history, question)
+    doc_id = get_doc_id_from_name(document)
 
     retrieved = retrieve_with_score(
         standalone_question,
-        document
+        doc_id
     )
 
     if not retrieved:
@@ -80,7 +78,7 @@ def answer_question(question: str, chat_history: list, document=None):
         }
 
     retrieved = retrieved[:5]
-
+    print("SCORES:", [row.get("score") for row in retrieved])
     context_chunks = []
     similarities = []
     citations = []
@@ -94,11 +92,18 @@ def answer_question(question: str, chat_history: list, document=None):
 
         if content:
             context_chunks.append(content)
-            similarities.append(similarity)
+            if isinstance(similarity, (int, float)):
+                similarities.append(similarity)
 
         if doc_id:
             book_name = get_document_name(doc_id)
-            citations.append(f"{book_name} (page {page})")
+            
+            if not book_name or book_name == "unknown":
+                continue
+            parts = [book_name]
+            if isinstance(page, int) and page > 0:
+                parts.append(f"page {page}")
+            citations.append(" — ".join(parts))
 
     if not context_chunks:
         return {
@@ -108,10 +113,14 @@ def answer_question(question: str, chat_history: list, document=None):
         }
 
     # confidence score
-    confidence = sum(similarities) / len(similarities)
-    confidence = max(0.0, min(1.0, float(confidence)))
+    if not similarities:
+        confidence = 0.0
+    else:
+        confidence = max(similarities)
+        confidence = max(0.0, min(1.0, float(confidence)))
 
-    if confidence < 0.25:
+    if confidence < 0.2:
+        print("neeche wala confidence")
         return {
             "answer": "Not found in internal documents.",
             "citations": [],
@@ -120,7 +129,6 @@ def answer_question(question: str, chat_history: list, document=None):
 
     # build context
     context = "\n\n".join(context_chunks)
-
     prompt = SYSTEM_PROMPT.format(
         context=context,
         question=standalone_question
@@ -140,18 +148,21 @@ def answer_question(question: str, chat_history: list, document=None):
 # ---------------------------------
 
 def summarize_documents(document=None):
-   
-    if document and "_" in document:
-        document = document.split("_",1)[0]
     print("Summarizing document:", document)
     query = supabase.table("chunks").select(
         "text, source"
     )
-
     if document:
-        query = query.eq("source", document)
-
-    response = query.execute()
+        doc_id = get_doc_id_from_name(document)
+        if not doc_id:
+            return {
+                "summary": "Document not found.",
+                "citations": []
+            }
+            
+        query = query.eq("source", doc_id)       
+    response = query.limit(15).execute() # limit context for LLM
+    
 
     if not response.data:
         return {
@@ -171,11 +182,8 @@ def summarize_documents(document=None):
             "citations": []
         }
 
-    # limit context for LLM
-    chunks = chunks[:15]
-
+    
     context = "\n\n".join(chunks)
-
     prompt = SUMMARY_PROMPT.format(context=context)
 
     result = llm().invoke(prompt)
