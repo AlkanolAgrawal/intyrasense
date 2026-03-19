@@ -9,12 +9,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client
-from backend.utils import ingestion_status
-
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
 from backend.utils import list_documents
-
+from backend.state import get_ingestion_status
+from backend.state import set_ingestion_status
 
 # ---------------------------------
 # ENV + LOGGING
@@ -69,7 +68,7 @@ def health():
 # ---------------------------------
 @app.get("/ingestion-status")
 def ingestion_status_api():
-    return {"state": ingestion_status["state"]}
+    return get_ingestion_status()
 
 # ---------------------------------
 # DOCUMENT UPLOAD
@@ -94,7 +93,6 @@ async def upload_documents(files: list[UploadFile] = File(...)):
             hash_value = file_hash(file_bytes)
             unique_name = f"{hash_value}_{file.filename}"
 
-
             if unique_name in existing_files:
                 continue
             
@@ -109,15 +107,23 @@ async def upload_documents(files: list[UploadFile] = File(...)):
             raise HTTPException(status_code=500, detail=str(e))
         
     if uploaded_files:
+        # Mark running before the worker starts so clients never get stuck at idle.
+        set_ingestion_status("running")
         threading.Thread(
             target=ingest_documents,
             args=(uploaded_files,), ##unique_names
             daemon=True
         ).start()
+        message = "Chunk ingestion started."
+    else:
+        # Nothing new to index (e.g. duplicate uploads only).
+        set_ingestion_status("completed")
+        message = "No new files to index."
 
     return {
         "status": "upload_successful",
-        "files": uploaded_files
+        "files": uploaded_files,
+        "message": message,
     }
     
 # ---------------------------------

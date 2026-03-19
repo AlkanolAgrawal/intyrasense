@@ -6,8 +6,13 @@ services:
       dockerfile: Docker/Dockerfile.backend
     ports:
       - "8000:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     volumes:
-      - ../data:/app/data
+      - ../data/raw_docs:/app/data/raw_docs
+      - ../data/faiss_index:/app/data/faiss_index
     env_file:
       - ../.env
 
@@ -18,6 +23,8 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - BACKEND_URL=${BACKEND_URL}
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
+    env_file:
+      - ../.env
     depends_on:
       - backend

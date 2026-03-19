@@ -3,7 +3,9 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pdf2image import convert_from_path
 import pytesseract
-from backend.utils import file_hash, set_ingestion_status
+from backend.state import set_ingestion_status
+from backend.state import get_ingestion_status
+from backend.utils import file_hash
 from backend.models import embeddings
 from backend.supabase_client import supabase
 from langchain_core.documents import Document
@@ -195,7 +197,7 @@ def ingest_documents(uploaded_files):
 
         if not texts:
             print("No valid chunks.")
-            set_ingestion_status("completed")
+            set_ingestion_status("completed", )
             return
 
         # -----------------------------
@@ -224,76 +226,6 @@ def ingest_documents(uploaded_files):
                 print("Insert error:", e)
 
         print(f"✓ Ingested {len(records)} chunks")
-        set_ingestion_status("completed")
-
-    except Exception as e:
-        print("Ingestion failed:", e)
-        set_ingestion_status("failed")
-    try:
-        set_ingestion_status("running")
-        documents = load_documents(uploaded_files)
-        if not documents:
-            print("No new documents to ingest.")
-            set_ingestion_status("completed")
-            return
-
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,
-            chunk_overlap=250
-        )
-
-        chunks = splitter.split_documents(documents)
-        print(f"Processing {len(chunks)} chunks...")
-
-        texts = []
-        sources = []
-        pages = []
-
-        for chunk in chunks:
-            text = chunk.page_content.strip()
-
-            if len(text) < 20:
-                continue
-
-            texts.append(text)
-            sources.append(chunk.metadata.get("source"))
-            pages.append(chunk.metadata.get("page", 1))
-
-        if not texts:
-            print("No valid chunks.")
-            set_ingestion_status("completed")
-            return
-
-        # -----------------------------------
-        # EMBEDDINGS
-        # -----------------------------------
-        vectors = embed_parallel(texts)
-        records = []
-
-        for text, vector, source, page in zip(
-            texts,
-            vectors,
-            sources,
-            pages
-        ):
-            records.append({
-                "source": source,
-                "page": page,
-                "text": text,
-                "embedding": vector
-            })
-
-        # -----------------------------------
-        # BATCH INSERT
-        # -----------------------------------
-        for i in range(0, len(records), INSERT_BATCH):
-            batch = records[i:i + INSERT_BATCH]
-            try:
-                supabase.table("chunks").insert(batch).execute()
-            except Exception as e:
-                print("Insert error:", e)
-
-        print(f"✓ Successfully ingested {len(records)} chunks into Supabase.")
         set_ingestion_status("completed")
 
     except Exception as e:

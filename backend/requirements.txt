@@ -20,4 +20,6 @@ pillow
 beautifulsoup4
 lxml
 requests
+redis
+redis-server
 supabase

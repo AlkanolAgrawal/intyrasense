@@ -13,13 +13,6 @@ def list_documents():
 
 def file_hash(data: bytes):
     return hashlib.sha256(data).hexdigest()
-ingestion_status = { 
-    "state": "idle"
-}
-def set_ingestion_status(state: str):
-    ingestion_status["state"] = state
-def get_ingestion_status():
-    return ingestion_status
 
 def get_doc_id_from_name(name):
     res = (supabase.table("documents") 

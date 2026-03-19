@@ -74,45 +74,46 @@ if st.button("Upload & Index"):
                 files=files_payload,
                 timeout=120
             )
-
+            print("Upload response:", r.json())
         if r.status_code == 200:
-
             data = r.json()
-
             st.success("Documents uploaded successfully.")
             st.info(data.get("message", "Chunk ingestion started."))
 
-            status_box = st.empty()
+            if data.get("files"):
+                status_box = st.empty()
+                deadline = time.time() + 600
+                while True:
+                    try:
+                        res = requests.get(
+                            f"{BACKEND_URL}/ingestion-status",
+                            timeout=5
+                        )
+                        print("Ingestion status response:", res.status_code, res.text)
+                        if res.status_code == 200:
+                            state = res.json().get("state")
 
-            while True:
+                            if state == "running":
+                                status_box.info("Indexing document chunks...")
 
-                try:
-                    res = requests.get(
-                        f"{BACKEND_URL}/ingestion-status",
-                        timeout=5
-                    )
+                            elif state == "completed":
+                                status_box.success(
+                                    "✔ All document chunks ingested successfully."
+                                )
+                                break
 
-                    if res.status_code == 200:
+                            elif state == "failed":
+                                status_box.error("Ingestion failed.")
+                                break
 
-                        state = res.json().get("state")
+                    except:
+                        status_box.warning("Checking ingestion status...")
 
-                        if state == "running":
-                            status_box.info("Indexing document chunks...")
+                    if time.time() >= deadline:
+                        status_box.error("Ingestion status timed out. Please try again.")
+                        break
 
-                        elif state == "completed":
-                            status_box.success(
-                                "✔ All document chunks ingested successfully."
-                            )
-                            break
-
-                        elif state == "failed":
-                            status_box.error("Ingestion failed.")
-                            break
-
-                except:
-                    status_box.warning("Checking ingestion status...")
-
-                time.sleep(2)
+                    time.sleep(2)
 
             st.session_state.chat_history.clear()
             get_documents.clear()

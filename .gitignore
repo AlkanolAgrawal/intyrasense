@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
+*.pyc
 *$py.class
 
 # C extensions
@@ -22,6 +23,10 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+*.egg-info
+
+# macOS metadata
+.DS_Store
 .installed.cfg
 *.egg
 MANIFEST
@@ -174,6 +179,7 @@ cython_debug/
 data/faiss_index/
 
 # Uploaded documents (user data)
+data/raw_docs/
 data/raw_docs/*.pdf
 data/raw_docs/*.md
 data/raw_docs/*.txt
