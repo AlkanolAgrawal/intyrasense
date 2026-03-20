@@ -6,15 +6,10 @@ services:
       dockerfile: Docker/Dockerfile.backend
     ports:
       - "8000:8000"
-    environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-    volumes:
-      - ../data/raw_docs:/app/data/raw_docs
-      - ../data/faiss_index:/app/data/faiss_index
     env_file:
       - ../.env
+    networks:
+      - intyrasense-network
 
   frontend:
     build:
@@ -28,3 +23,9 @@ services:
       - ../.env
     depends_on:
       - backend
+    networks:
+      - intyrasense-network
+
+networks:
+  intyrasense-network:
+    driver: bridge
