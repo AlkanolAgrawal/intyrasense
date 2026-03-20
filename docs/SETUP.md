@@ -43,7 +43,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-> **Note**: The first run will download the `all-MiniLM-L6-v2` embedding model (~80 MB). This is a one-time download.
+> **Note**: The first run will download the `BAAI/bge-small-en-v1.5` embedding model (~80 MB). This is a one-time download.
 
 ---
 
@@ -53,10 +53,12 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set your Groq API key:
+Edit `.env` and set your Groq API key and Supabase credentials:
 
 ```env
 GROQ_API_KEY=gsk_your_actual_key_here
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_KEY=your_supabase_key_here
 ```
 
 ---
@@ -116,22 +118,22 @@ The web UI will open at **http://localhost:8501**
 
 ---
 
-## Using the Makefile
+## 8. Using the Makefile
 
 For convenience, use the included Makefile shortcuts:
 
 ```bash
 make install    # Install all dependencies
-make run        # Start backend + frontend
+make run        # Start backend + frontend (requires two terminals)
 make backend    # Start backend only
 make frontend   # Start frontend only
 make docker-up  # Start with Docker Compose
-make clean      # Remove generated data and caches
+make clean      # Remove generated Python cache files
 ```
 
 ---
 
-## Troubleshooting
+## 9. Troubleshooting
 
 ### "ModuleNotFoundError"
 
@@ -140,6 +142,8 @@ Ensure your virtual environment is activated and dependencies are installed:
 ```bash
 source venv/bin/activate
 pip install -r requirements.txt
+pip install -r backend/requirements.txt
+pip install -r frontend/requirements.txt
 ```
 
 ### "Backend not reachable" in Streamlit
@@ -150,13 +154,13 @@ The backend must be running before the frontend. Start the backend first:
 uvicorn backend.main:app --reload
 ```
 
-### "GROQ_API_KEY not set"
+### "GROQ_API_KEY not set" or "SUPABASE_URL not set"
 
-Ensure your `.env` file exists and contains a valid key:
+Ensure your `.env` file exists and contains all required variables:
 
 ```bash
 cat .env
-# Should show: GROQ_API_KEY=gsk_...
+# Should show: GROQ_API_KEY=gsk_..., SUPABASE_URL=..., SUPABASE_KEY=...
 ```
 
 ### Slow first startup

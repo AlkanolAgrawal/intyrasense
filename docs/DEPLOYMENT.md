@@ -17,7 +17,7 @@
 ```bash
 # 1. Configure environment
 cp .env.example .env
-# Edit .env and add your GROQ_API_KEY
+# Edit .env and add your GROQ_API_KEY, SUPABASE_URL, and SUPABASE_KEY
 
 # 2. Build and start services
 docker compose -f Docker/docker-compose.yml up --build
@@ -60,14 +60,11 @@ docker-compose.yml
     └── Exposed on port 8501
 ```
 
-**Shared volumes:**
+**Shared environment:**
 
-- `../data:/app/data` — Document storage and FAISS index persists across container restarts
-
-**Environment:**
-
-- Backend reads `.env` from the project root via `env_file`
-- Frontend receives `BACKEND_URL` as an environment variable pointing to the backend container
+- Backend and frontend share `.env` file via `env_file: ../.env`
+- Backend uses: `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`
+- Frontend uses: `BACKEND_URL` (defaults to `http://backend:8000` for container networking)
 
 ---
 
@@ -123,8 +120,8 @@ server {
 
 ### Performance
 
-- **Embedding model**: Loaded once at startup, shared across all requests
-- **FAISS index**: Kept in memory for fast retrieval
+- **Embedding model**: Loaded once at startup, shared across all requests (singleton pattern)
+- **Vector search**: Supabase pgvector similarity search with indexed embeddings
 - **Groq API**: No local GPU needed — inference happens on Groq's infrastructure
 - For high traffic, consider running multiple backend workers:
 
@@ -134,10 +131,9 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ### Data Persistence
 
-Ensure the `data/` directory is persisted:
-
-- **Docker**: Already mounted as a volume in `docker-compose.yml`
-- **Cloud**: Mount a persistent volume (e.g., AWS EBS, GCP Persistent Disk)
+- **Supabase**: All documents and chunks are automatically persisted in managed PostgreSQL
+- **Backups**: Enable automatic backups via Supabase dashboard
+- No local data directories need to be manually persisted (encryption/security handled by Supabase)
 
 ### Monitoring
 
