@@ -162,3 +162,4 @@ make docker-up
 - [ ] Develop a scalable frontend architecture (modular components + API-driven UI)
 - [ ] Introduce RBAC and secure API access (JWT + rate limiting)
 - [ ] Enable horizontal scaling for processing pipeline (queue-based workers)
+
