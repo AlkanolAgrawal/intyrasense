@@ -154,3 +154,11 @@ make docker-up
 | `SUPABASE_URL` | Yes      | Supabase project URL |
 | `SUPABASE_KEY` | Yes      | Supabase API key     |
 | `BACKEND_URL`  | No       | Frontend backend URL |
+
+## 🚀 Future Improvements
+
+- [ ] Implement document lifecycle management (upload, update, delete)
+- [ ] Add OAuth2-based authentication (Google/GitHub SSO)
+- [ ] Develop a scalable frontend architecture (modular components + API-driven UI)
+- [ ] Introduce RBAC and secure API access (JWT + rate limiting)
+- [ ] Enable horizontal scaling for processing pipeline (queue-based workers)
