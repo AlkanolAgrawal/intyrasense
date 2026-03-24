@@ -166,38 +166,31 @@ async def get_documents():
 # ---------------------------------
 @app.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
-
     try:
-        # ---------------------------------
-        # 1. Fetch document metadata
-        # ---------------------------------
         doc_res = supabase.table("documents") \
             .select("*") \
             .eq("id", doc_id) \
             .execute()
 
         if not doc_res.data:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(404, "Document not found")
 
         doc = doc_res.data[0]
-        file_path = doc["file_path"]   # stored during upload
+        file_path = doc.get("storage_path")
 
-        # ---------------------------------
-        # 2. Delete chunks (pgvector table)
-        # ---------------------------------
+        if not file_path:
+            raise HTTPException(400, "storage_path missing")
+
+        # delete chunks
         supabase.table("chunks") \
             .delete() \
-            .eq("doc_id", doc_id) \
+            .eq("source", doc_id) \
             .execute()
 
-        # ---------------------------------
-        # 3. Delete file from storage
-        # ---------------------------------
+        # delete file
         supabase.storage.from_(BUCKET_NAME).remove([file_path])
 
-        # ---------------------------------
-        # 4. Delete metadata
-        # ---------------------------------
+        # delete document
         supabase.table("documents") \
             .delete() \
             .eq("id", doc_id) \
@@ -206,4 +199,4 @@ async def delete_document(doc_id: str):
         return {"status": "deleted", "doc_id": doc_id}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))

@@ -165,9 +165,9 @@ if selected_name != "All Documents":
         st.caption(f"Selected: {selected_name}")
 
     with col2:
-        if st.button("🗑", help="Delete document"):
-            doc_id = doc_map[selected_name]["id"]
+        doc_id = doc_map[selected_name]["id"]
 
+        if st.button("🗑", help="Delete document", key=f"delete_{doc_id}"):
             try:
                 res = requests.delete(
                     f"{BACKEND_URL}/documents/{doc_id}",
@@ -176,14 +176,14 @@ if selected_name != "All Documents":
 
                 if res.status_code == 200:
                     st.success("Deleted successfully")
-                    get_documents.clear()   # clear cache
+                    get_documents.clear()
                     st.session_state.chat_history.clear()
                     st.rerun()
                 else:
-                    st.error("Delete failed")
+                    st.error(f"Delete failed: {res.text}")
 
-            except:
-                st.error("Backend not reachable")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
 # ==============================
 # SUMMARIZATION
 # ==============================
