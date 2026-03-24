@@ -4,12 +4,11 @@ def list_documents():
     res = (
         supabase
         .table("documents")
-        .select("name, storage_path")
+        .select("id, name, storage_path")
+        .order("name", desc=False)
         .execute()
     )
-    if not res.data:
-        return []
-    return sorted(res.data, key=lambda x: x["storage_path"])  ##returns sorted list of docs(id,name) by name
+    return res.data or []
 
 def file_hash(data: bytes):
     return hashlib.sha256(data).hexdigest()
@@ -22,3 +21,9 @@ def get_doc_id_from_name(name):
         .execute()
     )
     return res.data[0]["id"] if res.data else None
+
+
+
+
+
+    

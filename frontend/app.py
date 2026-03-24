@@ -128,13 +128,21 @@ if st.button("Upload & Index"):
 # DOCUMENT SELECTION
 # ==============================
 
+# ==============================
+# DOCUMENT SELECTION
+# ==============================
+
 st.divider()
 st.header("📂 Select Document")
+
 docs = get_documents()
-# print("Fetched documents:", docs)
+
 doc_map = {}
 for d in docs:
-    doc_map[d["name"]] = d["storage_path"] 
+    doc_map[d["name"]] = {
+        "id": d["id"],
+        "path": d["storage_path"]
+    }
 
 options = ["All Documents"] + list(doc_map.keys())
 
@@ -142,11 +150,40 @@ selected_name = st.selectbox(
     "Choose document scope:",
     options
 )
-# print(doc_map)
+
 selected_document = None
 if selected_name != "All Documents":
-    selected_document = doc_map[selected_name]
-print("Selected document path:", selected_document)
+    selected_document = doc_map[selected_name]["path"]
+
+# ------------------------------
+# DELETE BUTTON 
+# ------------------------------
+if selected_name != "All Documents":
+    col1, col2 = st.columns([5,1])
+
+    with col1:
+        st.caption(f"Selected: {selected_name}")
+
+    with col2:
+        if st.button("🗑", help="Delete document"):
+            doc_id = doc_map[selected_name]["id"]
+
+            try:
+                res = requests.delete(
+                    f"{BACKEND_URL}/documents/{doc_id}",
+                    timeout=10
+                )
+
+                if res.status_code == 200:
+                    st.success("Deleted successfully")
+                    get_documents.clear()   # clear cache
+                    st.session_state.chat_history.clear()
+                    st.rerun()
+                else:
+                    st.error("Delete failed")
+
+            except:
+                st.error("Backend not reachable")
 # ==============================
 # SUMMARIZATION
 # ==============================
