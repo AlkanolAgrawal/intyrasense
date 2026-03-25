@@ -59,7 +59,7 @@ class SummarizeRequest(BaseModel):
 # ---------------------------------
 # HEALTH
 # ---------------------------------
-@app.get("/", methods=["GET", "HEAD"])
+@app.get("/")
 def health():
     return {"status": "running"}
 
