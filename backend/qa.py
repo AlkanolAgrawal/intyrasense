@@ -42,16 +42,16 @@ def rewrite_question(chat_history, question):
     )
 
     prompt = f"""
-Rewrite the follow-up question so it is fully self-contained.
+        Rewrite the follow-up question so it is fully self-contained.
 
-Conversation:
-{history}
+        Conversation:
+        {history}
 
-Follow-up question:
-{question}
+        Follow-up question:
+        {question}
 
-Standalone question:
-"""
+        Standalone question:
+    """
 
     response = llm().invoke(prompt)
 

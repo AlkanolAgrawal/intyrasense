@@ -3,6 +3,7 @@ import uuid
 import threading
 import warnings
 import logging
+from fastapi.responses import Response
 from backend.utils import file_hash
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -62,6 +63,10 @@ class SummarizeRequest(BaseModel):
 @app.get("/")
 def health():
     return {"status": "running"}
+
+@app.head("/")
+def health_head():
+    return Response(status_code=200)
 
 # ---------------------------------
 # DOCUMENT Ingestion Status
