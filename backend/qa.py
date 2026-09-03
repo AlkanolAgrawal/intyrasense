@@ -146,7 +146,6 @@ def answer_question(question: str, chat_history: list, document=None):
 # ---------------------------------
 # DOCUMENT SUMMARIZATION
 # ---------------------------------
-
 def summarize_documents(document=None):
     print("Summarizing document:", document)
     query = supabase.table("chunks").select(

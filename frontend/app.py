@@ -123,11 +123,6 @@ if st.button("Upload & Index"):
     except requests.exceptions.RequestException:
         st.error("Backend not reachable.")
 
-
-# ==============================
-# DOCUMENT SELECTION
-# ==============================
-
 # ==============================
 # DOCUMENT SELECTION
 # ==============================
