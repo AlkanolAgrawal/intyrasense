@@ -35,6 +35,9 @@ frontend: ## Start the Streamlit frontend
 
 run-frontend: frontend ## Alias for frontend
 
+worker: ## Start Celery worker (uses -P solo for Windows compatibility)
+	celery -A backend.celery_app.celery worker --loglevel=info -P solo
+
 # ---- Docker ----
 
 docker-up: ## Build and start all services with Docker Compose

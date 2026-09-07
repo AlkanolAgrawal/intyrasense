@@ -21,3 +21,5 @@ beautifulsoup4
 lxml
 requests
 supabase
+celery
+redis

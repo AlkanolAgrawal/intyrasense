@@ -1,13 +1,52 @@
 services:
 
+  redis:
+    image: redis:7-alpine
+    container_name: intyrasense-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - intyrasense-network
+
+  celery_worker:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile.backend
+    container_name: intyrasense-celery-worker
+    command: celery -A backend.celery_app.celery worker --loglevel=info
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - intyrasense-network
+
   backend:
     build:
       context: ..
       dockerfile: Docker/Dockerfile.backend
+    container_name: intyrasense-backend
     ports:
       - "8000:8000"
     env_file:
       - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - intyrasense-network
 
@@ -15,6 +54,7 @@ services:
     build:
       context: ..
       dockerfile: Docker/Dockerfile.frontend
+    container_name: intyrasense-frontend
     ports:
       - "8501:8501"
     environment:

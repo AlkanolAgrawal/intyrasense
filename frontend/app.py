@@ -81,12 +81,15 @@ if st.button("Upload & Index"):
             st.info(data.get("message", "Chunk ingestion started."))
 
             if data.get("files"):
+                task_id = data.get("task_id")
                 status_box = st.empty()
                 deadline = time.time() + 600
                 while True:
                     try:
+                        params = {"task_id": task_id} if task_id else None
                         res = requests.get(
                             f"{BACKEND_URL}/ingestion-status",
+                            params=params,
                             timeout=5
                         )
                         print("Ingestion status response:", res.status_code, res.text)

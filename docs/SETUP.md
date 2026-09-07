@@ -11,6 +11,8 @@
 | Python | 3.11+ | Tested with 3.11 and 3.12 |
 | pip | Latest | `pip install --upgrade pip` |
 | Groq API Key | — | [Get one free](https://console.groq.com) |
+| Supabase project | — | [Create one](https://supabase.com) with `documents` + `chunks` tables |
+| Redis | Optional | Upstash (cloud) or local — graceful fallback without it |
 | Tesseract OCR | Optional | Required only for scanned PDF support |
 | Poppler | Optional | Required only for PDF-to-image conversion (OCR) |
 | Docker | Optional | For containerized deployment |
@@ -30,8 +32,8 @@ cd intyrasense
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux / macOS
-# venv\Scripts\activate   # Windows
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux / macOS
 ```
 
 ---
@@ -53,13 +55,21 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set your Groq API key and Supabase credentials:
+Edit `.env` and set your credentials:
 
 ```env
+# Required
 GROQ_API_KEY=gsk_your_actual_key_here
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_KEY=your_supabase_key_here
+
+# Optional — Celery + Redis
+USE_CELERY=true
+REDIS_URL=redis://localhost:6379/0
+# For Upstash: REDIS_URL=rediss://default:YOUR_PASSWORD@YOUR_ENDPOINT.upstash.io:6379
 ```
+
+See `.env.example` for the full list of variables.
 
 ---
 
@@ -92,7 +102,7 @@ brew install tesseract poppler
 ### Terminal 1 — Backend
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 The API will be available at **http://127.0.0.1:8000**  
@@ -106,6 +116,16 @@ streamlit run frontend/app.py
 
 The web UI will open at **http://localhost:8501**
 
+### Terminal 3 — Celery Worker (Optional)
+
+```bash
+celery -A backend.celery_app.celery worker --loglevel=info -P solo
+```
+
+> **Note**: `-P solo` is required on Windows (no `fork` support). On Linux/macOS, you can omit it.
+
+> Without the Celery worker, document ingestion runs via in-process threads. With it, tasks are distributed through Redis for scalable background processing.
+
 ---
 
 ## 7. Verify Installation
@@ -113,8 +133,9 @@ The web UI will open at **http://localhost:8501**
 1. Open http://localhost:8501 in your browser
 2. Upload a test document (PDF, Markdown, or text)
 3. Click **Upload & Index**
-4. Ask a question about the document
-5. Verify you receive an answer with citations and a confidence score
+4. Wait for "All document chunks ingested successfully"
+5. Ask a question about the document
+6. Verify you receive an answer with citations and a confidence score
 
 ---
 
@@ -124,10 +145,11 @@ For convenience, use the included Makefile shortcuts:
 
 ```bash
 make install    # Install all dependencies
-make run        # Start backend + frontend (requires two terminals)
-make backend    # Start backend only
-make frontend   # Start frontend only
-make docker-up  # Start with Docker Compose
+make backend    # Start the FastAPI backend server
+make frontend   # Start the Streamlit frontend
+make worker     # Start Celery worker (uses -P solo for Windows)
+make docker-up  # Build and start all services with Docker Compose
+make docker-down # Stop all Docker services
 make clean      # Remove generated Python cache files
 ```
 
@@ -140,10 +162,9 @@ make clean      # Remove generated Python cache files
 Ensure your virtual environment is activated and dependencies are installed:
 
 ```bash
-source venv/bin/activate
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux/macOS
 pip install -r requirements.txt
-pip install -r backend/requirements.txt
-pip install -r frontend/requirements.txt
 ```
 
 ### "Backend not reachable" in Streamlit
@@ -171,3 +192,15 @@ The first run downloads the embedding model (~80 MB). Subsequent starts will be 
 
 Verify Tesseract is installed: `tesseract --version`  
 Verify Poppler is installed: `pdftoppm -h`
+
+### Ingestion stuck at "running"
+
+- If using Celery: Ensure the worker is running (`make worker`)
+- If not using Celery: Check backend terminal for error logs
+- Workaround: Set `USE_CELERY=false` in `.env` to use in-process threads
+
+### Redis connection errors
+
+- For local Redis: Ensure Redis server is running (`redis-server` or Docker)
+- For Upstash: Ensure `REDIS_URL` starts with `rediss://` (note the double `s` for TLS)
+- Fallback: Set `USE_CELERY=false` to skip Redis entirely

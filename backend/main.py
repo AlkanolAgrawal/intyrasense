@@ -13,8 +13,9 @@ from supabase import create_client
 from backend.ingest import ingest_documents
 from backend.qa import answer_question, summarize_documents
 from backend.utils import list_documents
-from backend.state import get_ingestion_status
-from backend.state import set_ingestion_status
+from backend.state import get_ingestion_status, set_ingestion_status
+from backend.celery_app import is_celery_available
+from backend.tasks import ingest_documents_task
 
 # ---------------------------------
 # ENV + LOGGING
@@ -72,8 +73,8 @@ def health_head():
 # DOCUMENT Ingestion Status
 # ---------------------------------
 @app.get("/ingestion-status")
-def ingestion_status_api():
-    return get_ingestion_status()
+def ingestion_status_api(task_id: str | None = None):
+    return get_ingestion_status(task_id=task_id)
 
 # ---------------------------------
 # DOCUMENT UPLOAD
@@ -111,25 +112,42 @@ async def upload_documents(files: list[UploadFile] = File(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
         
+    task_id = None
     if uploaded_files:
-        # Mark running before the worker starts so clients never get stuck at idle.
-        set_ingestion_status("running")
-        threading.Thread(
-            target=ingest_documents,
-            args=(uploaded_files,), ##unique_names
-            daemon=True
-        ).start()
-        message = "Chunk ingestion started."
+        if is_celery_available():
+            try:
+                celery_task = ingest_documents_task.delay(uploaded_files)
+                task_id = celery_task.id
+                set_ingestion_status("running", task_id=task_id)
+                message = "Chunk ingestion queued via Celery."
+                logging.info(f"Dispatched Celery task {task_id} for {len(uploaded_files)} files.")
+            except Exception as e:
+                logging.warning(f"Failed to dispatch Celery task ({e}), falling back to in-process thread.")
+                task_id = None
+
+        if not task_id:
+            # Fallback to in-process thread
+            set_ingestion_status("running")
+            threading.Thread(
+                target=ingest_documents,
+                args=(uploaded_files,),
+                daemon=True
+            ).start()
+            message = "Chunk ingestion started."
     else:
         # Nothing new to index (e.g. duplicate uploads only).
         set_ingestion_status("completed")
         message = "No new files to index."
 
-    return {
+    res = {
         "status": "upload_successful",
         "files": uploaded_files,
         "message": message,
     }
+    if task_id:
+        res["task_id"] = task_id
+
+    return res
     
 # ---------------------------------
 # QUESTION ANSWERING
